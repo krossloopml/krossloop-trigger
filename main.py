@@ -122,7 +122,9 @@ def process(trigger_document_path, company_book_path, model_name = "gemini-1.5-p
                 {
                     "role": "user",
                     "parts": [
+                        "<trigger_dcoument>",
                         files[0],
+                        "</trigger_dcoument>",
                         "<company_book>",
                         files[1],
                         "</company_book>",
