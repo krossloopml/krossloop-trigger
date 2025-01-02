@@ -2,6 +2,10 @@ from dotenv import load_dotenv
 import os
 import time
 import google.generativeai as genai
+import base64, json
+import vertexai
+from vertexai.generative_models import GenerativeModel, Part, SafetySetting
+from google.oauth2 import service_account
 
 from prompts import SYSTEM_PROMPT, SERVICES_OFFER_PROMPT
 
@@ -9,9 +13,50 @@ from prompts import SYSTEM_PROMPT, SERVICES_OFFER_PROMPT
 load_dotenv()
 
 # Access the variables using os.getenv
-api_key = os.getenv("GEMINI_API_KEY")
+# api_key = os.getenv("GEMINI_API_KEY")
+vertexai_credentials = json.loads(os.getenv("VERTEX_AI_JSON_CREDENTIALS"))
 
-genai.configure(api_key = api_key)
+credentials = service_account.Credentials.from_service_account_info(vertexai_credentials)
+
+# Initialize Vertex AI
+vertexai.init(project = "adept-shade-444819-a4", location = "us-central1", credentials = credentials)
+
+# Generation configuration
+# generation_config = {
+#     "max_output_tokens": 8192,
+#     "temperature": 0.5,
+#     "top_p": 0.95,
+#     "top_k": 40 if "flash" in model_name else 64,
+#     "seed": 50,
+# }
+generation_config = {
+    "max_output_tokens": 8192,
+    "temperature": 0.1,
+    "top_p": 0.0,
+    "top_k": 1,
+    "seed": 50,
+}
+
+# Safety settings
+safety_settings = [
+    SafetySetting(
+        category=SafetySetting.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold=SafetySetting.HarmBlockThreshold.OFF
+    ),
+    SafetySetting(
+        category=SafetySetting.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold=SafetySetting.HarmBlockThreshold.OFF
+    ),
+    SafetySetting(
+        category=SafetySetting.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold=SafetySetting.HarmBlockThreshold.OFF
+    ),
+    SafetySetting(
+        category=SafetySetting.HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold=SafetySetting.HarmBlockThreshold.OFF
+    ),
+]
+
 
 def calculate_cost(input_tokens, output_tokens, model):
     # Define pricing
@@ -66,85 +111,72 @@ def wait_for_files_active(files):
             file = genai.get_file(name)
         if file.state.name != "ACTIVE":
             raise Exception(f"File {file.name} failed to process")
+        
+def create_base64(file_path):
+    """
+    Converts a file to a Base64-encoded string.
+
+    :param file_path: Path to the file to be encoded
+    :return: Base64-encoded string
+    """
+    try:
+        with open(file_path, "rb") as file:
+            # Read the file's binary content
+            file_content = file.read()
+            # Encode the binary content to Base64
+            base64_encoded = base64.b64encode(file_content).decode('utf-8')
+            return base64_encoded
+    except Exception as e:
+        print(f"Error encoding file to Base64: {e}")
+        return None
 
 def process(trigger_document_path, company_book_path, model_name = "gemini-1.5-pro"):
     total_cost = 0
     start_time = time.time()
 
-    # Create the model
-    generation_config = {
-        "temperature": 0.5,
-        "top_p": 0.95,
-        "top_k": 40 if "flash" in model_name else 64,
-        "max_output_tokens": 8192,
-        "response_mime_type": "text/plain",
-    }
-
     try:
+        model = GenerativeModel(model_name)
 
-        model = genai.GenerativeModel(
-            model_name = model_name,
-            generation_config = generation_config,
-            system_instruction = SYSTEM_PROMPT,
+        # Convert the file to Base64
+        trigger_document_base64_string = create_base64(trigger_document_path)
+        if not trigger_document_base64_string:
+            print("Failed to create Base64 string. Exiting.")
+            return None
+        
+        company_book_base64_string = create_base64(company_book_path)
+        if not company_book_base64_string:
+            print("Failed to create Base64 string. Exiting.")
+            return None
+
+        # Prepare the document
+        trigger_document_document = Part.from_data(
+            mime_type = "application/pdf",
+            data = base64.b64decode(trigger_document_base64_string)
         )
 
-        # You may need to update the file paths
-        files = [
-            upload_to_gemini(trigger_document_path, mime_type = "application/pdf"),
-            upload_to_gemini(company_book_path, mime_type = "application/pdf"),
-        ]
-
-        # Some files have a processing delay. Wait for them to be ready.
-        wait_for_files_active(files)
-
-        chat_session = model.start_chat(
-            history = [
-                {
-                    "role": "user",
-                    "parts": [
-                        files[0],
-                        "<company_book>",
-                        files[1],
-                        "</company_book>",
-                    ],
-                },
-            ]
+        company_book_document = Part.from_data(
+            mime_type = "application/pdf",
+            data = base64.b64decode(company_book_base64_string)
         )
+
+        chat = model.start_chat()
 
         print("Analysing trigger document....")
-        analysis_response = chat_session.send_message("Analyse")
+        analysis_response = chat.send_message(
+            [SYSTEM_PROMPT, "<trigger_document>", trigger_document_document, "</trigger_document>", "<company_book>", company_book_document, "</company_book>"],
+            generation_config = generation_config,
+            safety_settings = safety_settings
+        )
         total_cost += calculate_cost(analysis_response.usage_metadata.prompt_token_count, analysis_response.usage_metadata.candidates_token_count, model_name)
         analysis_response = analysis_response.text
         print("Analysed trigger document.")
 
-        chat_session = model.start_chat(
-            history = [
-                {
-                    "role": "user",
-                    "parts": [
-                        files[0],
-                        "<company_book>",
-                        files[1],
-                        "</company_book>",
-                    ],
-                },
-                {
-                    "role": "model",
-                    "parts": [
-                        analysis_response,
-                    ],
-                },
-                {
-                    "role": "user",
-                    "parts": [
-                        SERVICES_OFFER_PROMPT,
-                    ],
-                }
-            ]
-        )
-
         print("Analysing and suggesting services...")
-        services_recommendation_response = chat_session.send_message("Analyse And Suggest")
+        services_recommendation_response = chat.send_message(
+            [SERVICES_OFFER_PROMPT],
+            generation_config = generation_config,
+            safety_settings = safety_settings,
+        )
         total_cost += calculate_cost(services_recommendation_response.usage_metadata.prompt_token_count, services_recommendation_response.usage_metadata.candidates_token_count, model_name)
         services_recommendation_response = services_recommendation_response.text
         print("Suggested services.")
