@@ -111,6 +111,7 @@ Instruction you MUST follow:-
 - EVERY RECOMMENDATION SHOULD HAVE A IMPACT SCORE (1 - 10), which entails how big a impact would the service have on the company. ( We only care about service with impact score > 7 )
 - Only after analysis and thought processes in <thoughts> </thoughts> have been made, you must now suggest services that would DEFINITELY help the company in mitigating and solving issues identified in STEP BY STEP analysis of trigger document.
 - For ALL recommended services, you must also give a strong valid reason, with grounding, why that service will help the said company.
+- DO NOT IMAGINE FUTURE SITUATIONS WHICH ARE NOT EXPLICITLY MENTIONED IN THE PROVIDED DOCUMENTS / <planning_guide> analysis / <final_thoughts> / <thoughts>, ONLY CONSIDER FACTS AND INFORMATION MENTIONED DIRECTLY IN THE DOCUMENTS / <planning_guide> analysis / <final_thoughts> / <thoughts>. ( KEEP THIS IN MIND ALSO WHEN RECOMMENDING SERVICES)
 - The reasoning should be EXTREMELY DETAILED, and cover in great depth and explanatory why the service is helpful. ( in the key 'detailed_reasoning' )
 - DO NOT RECOMMEND SERVICES WHICH DO NOT PROVIDE ANY BENEFIT TO THE COMPANY. ( we only want to recommend services with impact score > 7 )
 - THE RECOMMENDED SERVICES SHOULD BE DIRECTLY HELPFUL TO THE COMPANY, based on the STEP BY STEP <planning_guide> analysis, <final_thoughts>, and your generated <thoughts>.
