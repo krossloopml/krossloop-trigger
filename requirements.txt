@@ -1,5 +1,4 @@
+tqdm
 streamlit
 python-dotenv
-google-generativeai
-google-cloud-aiplatform
-google-auth
+google-genai

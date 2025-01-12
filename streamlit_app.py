@@ -4,8 +4,10 @@ import uuid
 import os
 from datetime import datetime
 
-from main import process
+from main import process_impact_and_recommendation, process_contemplation_impact_and_recommendation_parallel
 
+model_options = ["gemini-exp-1206", "gemini-1.5-pro", "gemini-2.0-flash-exp"]
+approach_options = ["All at once", "One at a time - with Contemplator"]
 
 def save_uploaded_file(uploaded_file, folder = "uploaded_pdfs"):
     """
@@ -27,13 +29,16 @@ def save_uploaded_file(uploaded_file, folder = "uploaded_pdfs"):
     
     return file_path
 
-def process_pdfs_with_llm(trigger_pdf_path, company_pdf_path, model) -> str:
+def process_pdfs_with_llm(trigger_pdf_path, company_pdf_path, model, approach) -> str:
     """
     Process the PDF files with an LLM.
     Replace this with your actual LLM implementation.
     """
     try:
-        response = process(trigger_pdf_path, company_pdf_path, model)
+        if approach == approach_options[0]:
+            response = process_impact_and_recommendation(trigger_pdf_path, company_pdf_path, model)
+        elif approach == approach_options[1]:
+            response = process_contemplation_impact_and_recommendation_parallel(trigger_pdf_path, company_pdf_path, model)
     except Exception as e:
         response = "Something went wrong.. :/\n"
         response += str(e)
@@ -69,8 +74,10 @@ def main():
     )
 
     # Model Selector
-    model_options = ["gemini-exp-1206", "gemini-1.5-pro", "gemini-2.0-flash-exp"]
     selected_model = st.selectbox("Select Model", options = model_options, index = 0)
+
+    # Approach Selector
+    selected_approach = st.selectbox("Select Approach", options = approach_options, index = 0)
     
     # GO button
     if trigger_pdf is not None and company_pdf is not None:
@@ -83,27 +90,32 @@ def main():
                 st.info(f"Files saved as:\n- {os.path.basename(trigger_pdf_path)}\n- {os.path.basename(company_pdf_path)}")
                 
                 # Process files
-                result = process_pdfs_with_llm(trigger_pdf_path, company_pdf_path, selected_model)
+                result = process_pdfs_with_llm(trigger_pdf_path, company_pdf_path, selected_model, selected_approach)
 
                 # Check the type of result
-                if isinstance(result, str):
-                    st.error("Processing failed or unexpected response.")
+                if isinstance(result, dict) == False:
+                    st.error("Processing failed or unexpected response format.")
                     st.error(result)  # Display the string directly
-                elif isinstance(result, tuple) and len(result) == 4:
-                    analysis_response, recommendation_response, time_taken, total_cost = result
+                elif "error" in result:
+                    st.error(result)
+                else:
                     st.success("Processing complete!")
-                    st.write(f"Time taken: {time_taken:.6f} seconds")
+                    st.write(f"Time taken: {result["time_taken"]:.6f} seconds")
 
-                    with st.expander("Analysis Response", expanded=False):
-                        st.text(analysis_response)
-
-                    with st.expander("Recommendation Response", expanded=True):
-                        st.text(recommendation_response)
+                    if type(result["response"]) == list:
+                        for idx, response in enumerate(result["response"]):
+                            with st.expander(f"Recommendation #{idx+1}", expanded=True):
+                                st.text(response)
+                    else:
+                        with st.expander("Analysis - Recommendation Response", expanded=True):
+                            st.text(result["response"])
 
                     with st.expander("Cost", expanded=False):
-                        st.write(f"Total cost: ${total_cost:.6f}")
-                else:
-                    st.error("Unexpected response format received.")
+                        st.write(f"Total cost: ${result["total_cost"]:.6f}")
+
+                # Delete the save file
+                os.remove(trigger_pdf_path)
+                os.remove(company_pdf_path)
 
 if __name__ == "__main__":
     main()
