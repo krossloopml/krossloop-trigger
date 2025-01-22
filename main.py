@@ -115,6 +115,9 @@ def process_contemplation_impact(trigger_document_path, company_book_path, model
     total_cost = 0
     start_time = time.time()
 
+    generation_config["temperature"] = 0.7 if "flash-thinking" in model_name else 1.0
+    generation_config["top_k"] = 40 if "flash-thinking" in model_name or "1.5-pro" in model_name else 64
+
     # try get api key from load balancer
     try:
         api_key = safe_getAvailableAPIKey(model_name)
@@ -227,6 +230,9 @@ def process_contemplation_impact(trigger_document_path, company_book_path, model
 def process_contemplation_recommendation(trigger_document_path, company_book_path, impact_analysis_response, service_data, model_name = "gemini-1.5-pro"):
     total_cost = 0
     start_time = time.time()
+
+    generation_config["temperature"] = 0.7 if "flash-thinking" in model_name else 1.0
+    generation_config["top_k"] = 40 if "flash-thinking" in model_name or "1.5-pro" in model_name else 64
 
     # try get api key from load balancer
     try:
@@ -365,6 +371,9 @@ def process_impact_and_recommendation(trigger_document_path, company_book_path, 
 
     total_cost = 0
     start_time = time.time()
+
+    generation_config["temperature"] = 0.7 if "flash-thinking" in model_name else 1.0
+    generation_config["top_k"] = 40 if "flash-thinking" in model_name or "1.5-pro" in model_name else 64
 
     # try get api key from load balancer
     try:

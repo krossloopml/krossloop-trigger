@@ -6,7 +6,7 @@ from datetime import datetime
 
 from main import process_impact_and_recommendation, process_contemplation_impact_and_recommendation_parallel
 
-model_options = ["gemini-exp-1206", "gemini-1.5-pro", "gemini-2.0-flash-exp"]
+model_options = ["gemini-2.0-flash-exp", "gemini-2.0-flash-thinking-exp-01-21", "gemini-exp-1206", "gemini-1.5-pro"]
 approach_options = ["All at once", "One at a time - with Contemplator"]
 
 def save_uploaded_file(uploaded_file, folder = "uploaded_pdfs"):
